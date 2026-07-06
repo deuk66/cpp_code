@@ -1,0 +1,84 @@
+from bs4 import BeautifulSoup, NavigableString
+import requests
+import time  # 為了加 delay
+
+#把一部分程式做成函式
+def fetch(url):   #把requests程式變成函式，連同18歲cookie一起
+    headers = {
+        "cookie": "over18=1"#cookie
+    }
+    r = requests.get(url, headers=headers)
+    r.encoding = "utf-8"
+    return r
+
+def extract_meta(soup, tag_name):  #in: 標籤名稱和解析過後的資料
+    tag = soup.find("span", class_="article-meta-tag", string=tag_name)  
+    if tag and tag.find_next_sibling():
+        return tag.find_next_sibling().text  #out: 
+    return "N/A"
+
+def extract_main_text(content_div):
+    texts = []
+    for content in content_div.contents:
+        if isinstance(content, NavigableString):
+            line = content.strip()
+            if line == "--":
+                break
+            if line:
+                texts.append(line)
+    return "\n".join(texts)
+
+# 主程式
+urls = []
+count = 0
+
+r = fetch("https://www.ptt.cc/bbs/Gossiping/index1.html")  #初始的頁面，網址是第一頁。可以一路查到底頁
+soup = BeautifulSoup(r.text, "html.parser")  #解析
+
+while count < 300:
+    entries = soup.find_all("div", class_="r-ent")  #把本頁所有
+    print(f"目前頁面有 {len(entries)} 篇文章")
+
+    for entry in entries:
+        if entry.a:
+            url = "https://www.ptt.cc" + entry.a['href']
+            if url not in urls:  # 避免重複
+                urls.append(url)
+                count += 1
+            if count >= 300:
+                break
+
+    print(f"已累積文章數：{count}")
+    
+    next_tag = soup.find("a", class_="btn wide", string="下頁 ›") 
+    if not next_tag:
+        print("無法找到下一頁")
+        break
+    next_url = "https://www.ptt.cc" + next_tag.get('href')
+    print(f"前往下一頁：{next_url}")
+    r = fetch(next_url)
+    soup = BeautifulSoup(r.text, "html.parser")
+
+# 抓每篇文章主文
+for i, url in enumerate(urls, 1):
+    r = fetch(url)
+    sp = BeautifulSoup(r.text, "html.parser")
+
+    main_div = sp.find('div', id="main-content", class_='bbs-screen bbs-content')
+    if not main_div:
+        continue
+
+    author = extract_meta(sp, "作者")
+    title = extract_meta(sp, "標題")
+    time_posted = extract_meta(sp, "時間")
+    content = extract_main_text(main_div)
+
+    print("="*40)
+    print(f"第{i}篇文章")
+    print(f"作者：{author}")
+    print(f"標題：{title}")
+    print(f"時間：{time_posted}")
+    print(f"連結：{url}")
+    print("內文：")
+    print(content)
+    print()

@@ -1,0 +1,8 @@
+template模板
+template <typename T, int Size> // T 是類型，Size 是非類型參數(代表實際的數值，類似於函數的參數)
+class StaticArray {
+    T data[Size]; // 直接使用 Size 定義數組大小
+public:
+    int getSize() { return Size; }
+};
+
